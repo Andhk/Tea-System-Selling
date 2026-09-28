@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kasir - Teh Oplos Ibu Risma</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div class="container">
+    <!-- HEADER -->
+    <header class="main-header">
+      <h1>Teh Oplos Ibu Risma</h1>
+      <div class="reset-timer">
+        Sistem Reset Dalam: <span id="countdown-timer">00:00:00</span>
+      </div>
+    </header>
+
+    <!-- NAVIGATION TABS -->
+    <nav class="nav-tabs">
+      <button type="button" id="btn-tab-kasir" class="tab-btn active" onclick="switchTab('kasir')">Kasir Utama</button>
+      <button type="button" id="btn-tab-baslok" class="tab-btn" onclick="switchTab('baslok')">Halaman Baslok</button>
+      <button type="button" id="btn-tab-statistik" class="tab-btn" onclick="switchTab('statistik')">Statistik & Laporan</button>
+    </nav>
+
+    <!-- TAB 1: KASIR UTAMA (TEH & KOPI) -->
+    <main id="tab-kasir-content" class="tab-content active">
+      <div class="kasir-grid">
+        <!-- SEKSI MENU -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Pilih Menu / Produk</h2>
+            <button type="button" class="btn btn-primary" onclick="bukaModalTambahProduk()">+ Tambah Menu</button>
+          </div>
+          <div id="grid-pilihan-menu" class="grid-menu">
+            <!-- Menu di-render via script.js -->
+          </div>
+        </section>
+
+        <!-- SEKSI KERANJANG & CHECKOUT -->
+        <section class="card">
+          <h2>Keranjang Belanja</h2>
+          <div id="kontainer-keranjang" class="cart-list">
+            <!-- Item keranjang di-render via script.js -->
+          </div>
+          
+          <div class="cart-summary">
+            <span>Total Bayar:</span>
+            <strong id="val-total-keranjang">Rp 0</strong>
+          </div>
+
+          <form id="form-checkout" onsubmit="prosesCheckoutKeranjang(event)">
+            <div class="form-group">
+              <label for="metode-bayar">Metode Bayar</label>
+              <select id="metode-bayar" class="form-control">
+                <option value="Tunai">Tunai</option>
+                <option value="QR">QRIS</option>
+                <option value="Utang">Utang</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="group-nama-pembeli" style="display: none;">
+              <label for="nama-pembeli">Nama Pembeli (Utang)</label>
+              <input type="text" id="nama-pembeli" class="form-control" placeholder="Masukkan nama...">
+            </div>
+
+            <button type="submit" id="btn-submit-penjualan" class="btn btn-success btn-block" disabled>Bayar / Simpan Transaksi</button>
+          </form>
+        </section>
+      </div>
+
+      <!-- KONTROL STOK TEH & KOPI -->
+      <section class="card full-width">
+        <h2>Kontrol Stok Bahan (Teh & Kopi)</h2>
+        <div class="stok-grid">
+          <div class="stok-item">
+            <span>Cup Besar: <strong id="stok-val-cupBesar">0</strong></span>
+            <div>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('cupBesar', -1)">-</button>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('cupBesar', 1)">+</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="bukaModalEditStok('cupBesar')">Edit</button>
+            </div>
+          </div>
+          <div class="stok-item">
+            <span>Cup Kecil: <strong id="stok-val-cupKecil">0</strong></span>
+            <div>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('cupKecil', -1)">-</button>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('cupKecil', 1)">+</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="bukaModalEditStok('cupKecil')">Edit</button>
+            </div>
+          </div>
+          <div class="stok-item">
+            <span>Kopi: <strong id="stok-val-kopi">0</strong></span>
+            <div>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('kopi', -1)">-</button>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('kopi', 1)">+</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="bukaModalEditStok('kopi')">Edit</button>
+            </div>
+          </div>
+          <div class="stok-item">
+            <span>Creamer: <strong id="stok-val-creamer">0</strong></span>
+            <div>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('creamer', -1)">-</button>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('creamer', 1)">+</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="bukaModalEditStok('creamer')">Edit</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RINGKASAN & FORM PENGELUARAN -->
+      <div class="dashboard-grid">
+        <div class="card card-ringkasan-highlight">
+          <h2>Ringkasan Kas Hari Ini</h2>
+          <div class="summary-box summary-box-lg">
+            <div class="ringkasan-row utama">
+              <span>Kas Akhir Teh:</span>
+              <strong id="val-kas-teh">Rp 0</strong>
+            </div>
+            <div class="ringkasan-row">
+              <span>Total Penjualan Teh:</span>
+              <span id="val-total-teh">Rp 0</span>
+            </div>
+            <div class="ringkasan-row">
+              <span>Total Kopi & Jajanan:</span>
+              <span id="val-kopi-jajanan">Rp 0</span>
+            </div>
+            <div class="ringkasan-row">
+              <span>Total Pengeluaran:</span>
+              <span id="val-total-pengeluaran" class="text-danger">Rp 0</span>
+            </div>
+          </div>
+          <div class="form-group inline-form">
+            <label style="font-size:0.9rem; font-weight:bold;">Modal/Deposit Awal:</label>
+            <input type="number" id="input-deposit-awal" class="form-control form-control-lg" placeholder="0">
+            <button type="button" class="btn btn-secondary" onclick="setDepositAwal()">Simpan</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Catat Pengeluaran Kas</h2>
+          <form id="form-pengeluaran" onsubmit="prosesPengeluaran(event)">
+            <div class="form-group">
+              <input type="text" id="ket-pengeluaran" class="form-control" placeholder="Keterangan (misal: Beli Es Batu)" required>
+            </div>
+            <div class="form-group">
+              <input type="number" id="nominal-pengeluaran" class="form-control" placeholder="Nominal (Rp)" required>
+            </div>
+            <button type="submit" class="btn btn-danger btn-block">Simpan Pengeluaran</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- TABEL TRANSAKSI TERGABUNG -->
+      <section class="card full-width">
+        <div class="card-header">
+          <h2>Riwayat Seluruh Transaksi Hari Ini</h2>
+          <button type="button" class="btn btn-secondary" onclick="downloadCSV()">Export CSV</button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Jam</th>
+                <th>Kategori</th>
+                <th>Detail</th>
+                <th>Total</th>
+                <th>Metode</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="body-tabel-transaksi">
+              <!-- Data transaksi gabungan di-render via script.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 2: HALAMAN BASLOK -->
+    <main id="tab-baslok-content" class="tab-content">
+      <div class="kasir-grid">
+        <section class="card">
+          <h2>Pilih Porsi Baslok</h2>
+          <div id="grid-pilihan-menu-baslok" class="grid-menu">
+            <!-- Preset Baslok di-render via script.js -->
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Keranjang Baslok</h2>
+          <div id="kontainer-keranjang-baslok" class="cart-list"></div>
+          
+          <div class="cart-summary">
+            <span>Total Bayar Baslok:</span>
+            <strong id="val-total-keranjang-baslok">Rp 0</strong>
+          </div>
+
+          <form id="form-checkout-baslok" onsubmit="prosesCheckoutBaslok(event)">
+            <div class="form-group">
+              <label for="metode-bayar-baslok">Metode Bayar</label>
+              <select id="metode-bayar-baslok" class="form-control">
+                <option value="Tunai">Tunai</option>
+                <option value="QR">QRIS</option>
+                <option value="Utang">Utang</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="group-nama-baslok" style="display: none;">
+              <label for="nama-pembeli-baslok">Nama Pembeli (Utang)</label>
+              <input type="text" id="nama-pembeli-baslok" class="form-control" placeholder="Masukkan nama...">
+            </div>
+
+            <button type="submit" id="btn-submit-baslok" class="btn btn-success btn-block" disabled>Simpan Transaksi Baslok</button>
+          </form>
+        </section>
+      </div>
+
+      <!-- KONTROL STOK BASLOK -->
+      <section class="card full-width">
+        <h2>Kontrol Stok Bahan Baslok</h2>
+        <div class="stok-grid">
+          <div class="stok-item">
+            <span>Stok Baslok (Porsi): <strong id="stok-val-baslokPorsi">0</strong></span>
+            <div>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('baslokPorsi', -1)">-</button>
+              <button type="button" class="btn btn-sm" onclick="ubahStok('baslokPorsi', 1)">+</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="bukaModalEditStok('baslokPorsi')">Edit</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RINGKASAN BASLOK -->
+      <div class="card card-ringkasan-highlight">
+        <h2>Ringkasan Penjualan Baslok</h2>
+        <div class="summary-box summary-box-lg">
+          <div class="ringkasan-row utama">
+            <span>Total Omset Baslok:</span>
+            <strong id="val-total-baslok" style="color:#E65100;">Rp 0</strong>
+          </div>
+          <div class="ringkasan-row">
+            <span>Kas Tunai Baslok:</span>
+            <span id="val-kas-baslok" style="font-weight:bold;">Rp 0</span>
+          </div>
+        </div>
+      </div>
+
+      <section class="card full-width">
+        <h2>Riwayat Transaksi Baslok (Tergabung)</h2>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Jam</th>
+                <th>Kategori</th>
+                <th>Detail</th>
+                <th>Total</th>
+                <th>Metode</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="body-tabel-baslok">
+              <!-- Replikasi tabel transaksi gabungan -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 3: STATISTIK & LAPORAN -->
+    <main id="tab-statistik-content" class="tab-content">
+      <div class="dashboard-grid">
+        <div class="card">
+          <h2>Trafik Penjualan Per Jam</h2>
+          <div class="chart-container">
+            <canvas id="chartTrafikJam"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Perbandingan Penjualan Kategori</h2>
+          <div class="chart-container">
+            <canvas id="chartPenjualanHarian"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card full-width">
+        <h2>Grafik Sisa Stok Bahan</h2>
+        <div class="chart-container" style="height: 250px;">
+          <canvas id="chartSisaStok"></canvas>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL TAMBAH PRODUK -->
+  <div id="modal-tambah-produk" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <h3>Tambah Menu Baru</h3>
+      <form onsubmit="simpanProdukBaru(event)">
+        <div class="form-group">
+          <label>Nama Menu</label>
+          <input type="text" id="nama-produk-baru" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Harga (Rp)</label>
+          <input type="number" id="harga-produk-baru" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Kategori</label>
+          <select id="kategori-produk-baru" class="form-control">
+            <option value="teh">Teh</option>
+            <option value="kopi_jajanan">Kopi & Jajanan</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="tutupModalTambahProduk()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT STOK MANUAL -->
+  <div id="modal-edit-stok" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <h3 id="label-modal-stok">Edit Stok</h3>
+      <div class="form-group">
+        <label>Jumlah Stok Baru</label>
+        <input type="number" id="input-stok-manual" class="form-control">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="tutupModalStok()">Batal</button>
+        <button type="button" class="btn btn-primary" onclick="simpanStokManual()">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE SDK (Versi Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <!-- JS Utama -->
+  <script src="script.js"></script>
+</body>
+</html>

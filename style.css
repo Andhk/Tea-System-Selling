@@ -17,7 +17,7 @@ body {
   margin: 0 auto;
 }
 
-/* HEADER & RESETS TIMER */
+/* HEADER & REALTIME CLOCK */
 .main-header {
   background: #2E7D32;
   color: white;
@@ -26,24 +26,40 @@ body {
   text-align: center;
   margin-bottom: 12px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
 .main-header h1 {
   font-size: 1.4rem;
-  margin-bottom: 4px;
 }
 
-.reset-timer {
+.header-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.realtime-clock-box {
   font-size: 0.85rem;
   background: rgba(0,0,0,0.2);
-  display: inline-block;
-  padding: 4px 12px;
+  padding: 6px 14px;
   border-radius: 20px;
 }
 
-.reset-timer span {
+.realtime-clock-box span {
   font-weight: bold;
   color: #FFEB3B;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 /* NAVIGATION TABS */
@@ -99,6 +115,8 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .card-header h2 {

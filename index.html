@@ -14,8 +14,11 @@
     <!-- HEADER -->
     <header class="main-header">
       <h1>Teh Oplos Ibu Risma</h1>
-      <div class="reset-timer">
-        Sistem Reset Dalam: <span id="countdown-timer">00:00:00</span>
+      <div class="header-info">
+        <div class="realtime-clock-box">
+          Waktu: <span id="realtime-clock">00:00:00</span>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="resetHanyaTransaksi()">Reset Transaksi</button>
       </div>
     </header>
 
@@ -157,8 +160,11 @@
       <!-- TABEL TRANSAKSI TERGABUNG -->
       <section class="card full-width">
         <div class="card-header">
-          <h2>Riwayat Seluruh Transaksi Hari Ini</h2>
-          <button type="button" class="btn btn-secondary" onclick="downloadCSV()">Export CSV</button>
+          <h2>Riwayat Seluruh Transaksi</h2>
+          <div class="header-actions">
+            <button type="button" class="btn btn-secondary" onclick="downloadCSV()">Export CSV</button>
+            <button type="button" class="btn btn-danger" onclick="resetHanyaTransaksi()">Reset Transaksi</button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -250,7 +256,13 @@
       </div>
 
       <section class="card full-width">
-        <h2>Riwayat Transaksi Baslok (Tergabung)</h2>
+        <div class="card-header">
+          <h2>Riwayat Transaksi Baslok</h2>
+          <div class="header-actions">
+            <button type="button" class="btn btn-secondary" onclick="downloadCSV()">Export CSV</button>
+            <button type="button" class="btn btn-danger" onclick="resetHanyaTransaksi()">Reset Transaksi</button>
+          </div>
+        </div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>

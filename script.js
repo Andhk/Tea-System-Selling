@@ -10,9 +10,14 @@ const firebaseConfig = {
   measurementId: "G-3FNRV2XVZ6"
 };
 
-// 2. INISIALISASI FIREBASE
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+// 2. INISIALISASI FIREBASE WITH FALLBACK
+let db = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+} catch (e) {
+  console.warn("Firebase tidak terhubung, berjalan dalam mode lokal:", e);
+}
 
 // DATABASE PRODUK DEFAULT
 const DEFAULT_DATABASE_PRODUK = {
@@ -28,14 +33,14 @@ const DEFAULT_DATABASE_PRODUK = {
   "baslok_pcs": { nama: "Baslok", harga: 1000, kategori: "baslok", stokKebutuhan: { baslokPorsi: 1 } }
 };
 
-let DATABASES_PRODUK = {};
+// INISIALISASI DATA LANGSUNG DENGAN DATA DEFAULT
+let DATABASES_PRODUK = JSON.parse(JSON.stringify(DEFAULT_DATABASE_PRODUK));
 
 // STATE MANAGEMENT
 let appState = {
   depositAwal: 0,
   stok: { cupBesar: 50, cupKecil: 50, kopi: 30, creamer: 40, baslokPorsi: 50 },
-  transaksi: [],
-  terakhirReset: new Date().toDateString()
+  transaksi: []
 };
 
 // Temporary Cart States
@@ -49,15 +54,20 @@ let targetEditStokKey = null;
 
 // INIT SYSTEM
 document.addEventListener("DOMContentLoaded", () => {
-  muatStateDariStorage();
-  cekOtomatisResetHari();
+  renderSemua(); // Render awal secara langsung
   initEventListeners();
   initCharts();
-  mulaiCountdownReset();
+  mulaiRealtimeClock();
+  muatStateDariStorage();
 });
 
 // FUNGSI REALTIME CLOUD FIREBASE
 function muatStateDariStorage() {
+  if (!db) {
+    renderSemua();
+    return;
+  }
+
   db.ref("teh_risma_state").on("value", (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -68,26 +78,32 @@ function muatStateDariStorage() {
       simpanState();
     }
     renderSemua();
-  }, (err) => console.error("Gagal konek state Firebase:", err));
+  }, (err) => {
+    console.error("Gagal konek state Firebase:", err);
+    renderSemua();
+  });
 
   db.ref("teh_risma_produk").on("value", (snapshot) => {
     const data = snapshot.val();
-    if (data) {
+    if (data && Object.keys(data).length > 0) {
       DATABASES_PRODUK = data;
     } else {
-      DATABASES_PRODUK = { ...DEFAULT_DATABASE_PRODUK };
+      DATABASES_PRODUK = JSON.parse(JSON.stringify(DEFAULT_DATABASE_PRODUK));
       simpanProduk();
     }
     renderSemua();
-  }, (err) => console.error("Gagal konek produk Firebase:", err));
+  }, (err) => {
+    console.error("Gagal konek produk Firebase:", err);
+    renderSemua();
+  });
 }
 
 function simpanState() {
-  db.ref("teh_risma_state").set(appState);
+  if (db) db.ref("teh_risma_state").set(appState);
 }
 
 function simpanProduk() {
-  db.ref("teh_risma_produk").set(DATABASES_PRODUK);
+  if (db) db.ref("teh_risma_produk").set(DATABASES_PRODUK);
 }
 
 function initEventListeners() {
@@ -103,6 +119,38 @@ function initEventListeners() {
     elMetodeBaslok.addEventListener("change", (e) => {
       document.getElementById("group-nama-baslok").style.display = e.target.value === "Utang" ? "block" : "none";
     });
+  }
+}
+
+// JAM REAL-TIME LIVE
+function mulaiRealtimeClock() {
+  function updateClock() {
+    const now = new Date();
+    const jam = String(now.getHours()).padStart(2, '0');
+    const menit = String(now.getMinutes()).padStart(2, '0');
+    const detik = String(now.getSeconds()).padStart(2, '0');
+
+    const elClock = document.getElementById("realtime-clock");
+    if (elClock) {
+      elClock.innerText = `${jam}:${menit}:${detik}`;
+    }
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+}
+
+// FUNGSI RESET HANYA TRANSAKSI
+function resetHanyaTransaksi() {
+  if (!appState.transaksi || appState.transaksi.length === 0) {
+    alert("Belum ada data transaksi untuk direset!");
+    return;
+  }
+
+  if (confirm("Apakah Anda yakin ingin menghapus SELURUH riwayat transaksi?\n\n(Catatan: Stok bahan dan Modal/Deposit Awal TIDAK akan terhapus).")) {
+    appState.transaksi = [];
+    simpanState();
+    renderSemua();
+    alert("Seluruh riwayat transaksi berhasil direset!");
   }
 }
 
@@ -181,6 +229,7 @@ function simpanProdukBaru(e) {
   };
 
   simpanProduk();
+  renderSemua();
   tutupModalTambahProduk();
   document.getElementById("nama-produk-baru").value = "";
   document.getElementById("harga-produk-baru").value = "";
@@ -194,6 +243,7 @@ function hapusProdukDariMenu(idProduk) {
     delete DATABASES_PRODUK[idProduk];
     if (keranjang[idProduk]) delete keranjang[idProduk];
     simpanProduk();
+    renderSemua();
   }
 }
 
@@ -313,13 +363,12 @@ function renderKeranjangBaslok() {
   btnSubmit.disabled = false;
 }
 
-// CHECKOUT KASIR UTAMA (DENGAN VALIDASI BLOKIR STOK HABIS)
+// CHECKOUT KASIR UTAMA
 function prosesCheckoutKeranjang(e) {
   e.preventDefault();
   const keys = Object.keys(keranjang);
   if (keys.length === 0) return;
 
-  // 1. Cek Kebutuhan Stok
   const totalKebutuhanStok = {};
   for (const idProduk of keys) {
     const item = DATABASES_PRODUK[idProduk];
@@ -331,7 +380,6 @@ function prosesCheckoutKeranjang(e) {
     }
   }
 
-  // 2. Blokir Jika Stok Kurang/Habis
   for (const [bahan, butuh] of Object.entries(totalKebutuhanStok)) {
     const sisaStok = appState.stok[bahan] || 0;
     if (sisaStok < butuh) {
@@ -340,7 +388,6 @@ function prosesCheckoutKeranjang(e) {
     }
   }
 
-  // 3. Proses Transaksi
   const metode = document.getElementById("metode-bayar").value;
   const namaPembeli = document.getElementById("nama-pembeli").value;
   const now = new Date();
@@ -380,19 +427,19 @@ function prosesCheckoutKeranjang(e) {
   keranjang = {};
   simpanState();
   renderKeranjang();
+  renderSemua();
 
   document.getElementById("form-checkout").reset();
   document.getElementById("group-nama-pembeli").style.display = "none";
   alert("Transaksi berhasil diproses!");
 }
 
-// CHECKOUT BASLOK (DENGAN VALIDASI BLOKIR STOK HABIS)
+// CHECKOUT BASLOK
 function prosesCheckoutBaslok(e) {
   e.preventDefault();
   const keys = Object.keys(keranjangBaslok);
   if (keys.length === 0) return;
 
-  // 1. Cek Kebutuhan Stok Baslok
   let butuhBaslok = 0;
   keys.forEach(idProduk => {
     const item = DATABASES_PRODUK[idProduk] || { stokKebutuhan: { baslokPorsi: 1 } };
@@ -402,14 +449,12 @@ function prosesCheckoutBaslok(e) {
     }
   });
 
-  // 2. Blokir Jika Stok Baslok Habis
   const sisaStokBaslok = appState.stok.baslokPorsi || 0;
   if (sisaStokBaslok < butuhBaslok) {
     alert(`Transaksi Baslok Gagal! Stok Baslok tidak cukup.\n(Dibutuhkan: ${butuhBaslok} Porsi, Tersedia: ${sisaStokBaslok} Porsi)`);
     return;
   }
 
-  // 3. Proses Transaksi
   const metode = document.getElementById("metode-bayar-baslok").value;
   const namaPembeli = document.getElementById("nama-pembeli-baslok").value;
   const now = new Date();
@@ -447,6 +492,7 @@ function prosesCheckoutBaslok(e) {
   keranjangBaslok = {};
   simpanState();
   renderKeranjangBaslok();
+  renderSemua();
 
   document.getElementById("group-nama-baslok").style.display = "none";
   alert("Transaksi Baslok berhasil diproses!");
@@ -475,10 +521,11 @@ function prosesPengeluaran(e) {
 
   appState.transaksi.unshift(dataTransaksi);
   simpanState();
+  renderSemua();
   document.getElementById("form-pengeluaran").reset();
 }
 
-// HAPUS TRANSAKSI (MENGEMBALIKAN STOK HABIS BILA DIHAPUS)
+// HAPUS TRANSAKSI INDIVIDUAL
 function hapusTransaksi(id) {
   const index = appState.transaksi.findIndex(x => x.id === id);
   if (index === -1) return;
@@ -497,6 +544,7 @@ function hapusTransaksi(id) {
 
     appState.transaksi.splice(index, 1);
     simpanState();
+    renderSemua();
   }
 }
 
@@ -505,6 +553,7 @@ function setDepositAwal() {
   const val = parseInt(document.getElementById("input-deposit-awal").value) || 0;
   appState.depositAwal = val;
   simpanState();
+  renderSemua();
   alert("Modal / Deposit Awal berhasil disimpan!");
 }
 
@@ -513,6 +562,7 @@ function ubahStok(key, delta) {
   if (appState.stok[key] !== undefined) {
     appState.stok[key] = Math.max(0, appState.stok[key] + delta);
     simpanState();
+    renderSemua();
   }
 }
 
@@ -532,6 +582,7 @@ function simpanStokManual() {
   if (targetEditStokKey) {
     appState.stok[targetEditStokKey] = val;
     simpanState();
+    renderSemua();
   }
   tutupModalStok();
 }
@@ -542,6 +593,7 @@ function lunasiUtang(id) {
   if (t) {
     t.statusUtang = "Lunas";
     simpanState();
+    renderSemua();
   }
 }
 
@@ -601,7 +653,7 @@ function renderSemua() {
     tbody.innerHTML = "";
 
     if (!appState.transaksi || appState.transaksi.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Belum ada riwayat transaksi hari ini</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Belum ada riwayat transaksi</td></tr>`;
       return;
     }
 
@@ -733,38 +785,6 @@ function updateCharts() {
     ];
     chartStokInstance.update();
   }
-}
-
-// RESET OTOMATIS TERSINKRONISASI
-function cekOtomatisResetHari() {
-  const hariIni = new Date().toDateString();
-  if (appState.terakhirReset !== hariIni) {
-    appState.transaksi = [];
-    appState.depositAwal = 0;
-    appState.terakhirReset = hariIni;
-    simpanState();
-  }
-}
-
-function mulaiCountdownReset() {
-  setInterval(() => {
-    const now = new Date();
-    const besok = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const sisaWaktu = besok - now;
-
-    const jam = Math.floor((sisaWaktu / (1000 * 60 * 60)) % 24);
-    const menit = Math.floor((sisaWaktu / (1000 * 60)) % 60);
-    const detik = Math.floor((sisaWaktu / 1000) % 60);
-
-    const elTimer = document.getElementById("countdown-timer");
-    if (elTimer) {
-      elTimer.innerText = `${String(jam).padStart(2, '0')}:${String(menit).padStart(2, '0')}:${String(detik).padStart(2, '0')}`;
-    }
-
-    if (jam === 0 && menit === 0 && detik === 0) {
-      cekOtomatisResetHari();
-    }
-  }, 1000);
 }
 
 // EXPORT CSV
